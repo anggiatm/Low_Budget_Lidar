@@ -102,7 +102,7 @@ void setup() {
         // enable Arduino interrupt detection
         //Serial.print(F("Enabling interrupt detection (Arduino external interrupt "));
         //Serial.print(digitalPinToInterrupt(INTERRUPT_PIN));
-        digitalPinToInterrupt(INTERRUPT_PIN);
+        //digitalPinToInterrupt(INTERRUPT_PIN);
         //Serial.println(F(")..."));
         attachInterrupt(digitalPinToInterrupt(INTERRUPT_PIN), dmpDataReady, RISING);
         mpuIntStatus = mpu.getIntStatus();
@@ -139,7 +139,7 @@ void loop() {
           Serial.print(",");
           Serial.print(sensor.readRangeSingleMillimeters());
           Serial.println(",");
-        angle_old=angle;
+          angle_old=angle;
         }
 
         
