@@ -139,7 +139,7 @@ void loop() {
           Serial.print(",");
           Serial.print(sensor.readRangeSingleMillimeters());
           Serial.println(",");
-        angle_old=angle;
+            angle_old=angle;
         }
 
         
