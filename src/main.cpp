@@ -1,9 +1,11 @@
 #include <Arduino.h>
-
 #include "I2Cdev.h"
 #include "MPU6050_6Axis_MotionApps20.h"
 #include <VL53L0X.h>
+#include <Servo.h>
+
 VL53L0X sensor;
+Servo motor;
 
 #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
     #include "Wire.h"
@@ -18,8 +20,8 @@ MPU6050 mpu;
 // VL53L0X
 
 bool blinkState = false;
-
 bool dmpReady = false;  
+
 uint8_t mpuIntStatus;  
 uint8_t devStatus;
 uint16_t packetSize;  
@@ -33,6 +35,8 @@ float ypr[3]; // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vecto
 
 int angle;
 int angle_old = 180;
+
+char command;
 
 volatile bool mpuInterrupt = false;
 void dmpDataReady() {
@@ -51,22 +55,18 @@ void setup() {
     
 
     Serial.begin(115200);
+    motor.attach(3);
 
     sensor.setTimeout(500);
     
-    if (!sensor.init()){
+    if (!sensor.init())
+    {
         //Serial.println("Failed to detect and initialize sensor!");
         while (1) {}
     }
-
-    //sensor.setSignalRateLimit(0.1);
-    // increase laser pulse periods (defaults are 14 and 10 PCLKs)
-    //sensor.setVcselPulsePeriod(VL53L0X::VcselPeriodPreRange, 18);       
-    //sensor.setVcselPulsePeriod(VL53L0X::VcselPeriodFinalRange, 14);
     
     // reduce timing budget to 20 ms (default is about 33 ms)
-    sensor.setMeasurementTimingBudget(33000);
-
+    sensor.setMeasurementTimingBudget(20000);
 
     // initialize device
     //Serial.println(F("Initializing I2C devices..."));
@@ -79,7 +79,6 @@ void setup() {
 
     // load and configure the DMP
     //Serial.println(F("Initializing DMP..."));
-    //Serial.println("1");
     devStatus = mpu.dmpInitialize();
 
     // supply your own gyro offsets here, scaled for min sensitivity
@@ -96,13 +95,12 @@ void setup() {
         mpu.PrintActiveOffsets();
         // turn on the DMP, now that it's ready
         //Serial.println(F("Enabling DMP..."));
-        //Serial.println("2");
         mpu.setDMPEnabled(true);
 
         // enable Arduino interrupt detection
         //Serial.print(F("Enabling interrupt detection (Arduino external interrupt "));
-        //Serial.print(digitalPinToInterrupt(INTERRUPT_PIN));
-        //digitalPinToInterrupt(INTERRUPT_PIN);
+        digitalPinToInterrupt(INTERRUPT_PIN);
+        //Serial.print();
         //Serial.println(F(")..."));
         attachInterrupt(digitalPinToInterrupt(INTERRUPT_PIN), dmpDataReady, RISING);
         mpuIntStatus = mpu.getIntStatus();
@@ -112,7 +110,6 @@ void setup() {
 
         packetSize = mpu.dmpGetFIFOPacketSize();
     } else {
-
         //Serial.print(F("DMP Initialization failed (code "));
         //Serial.print(devStatus);
         //Serial.println(F(")"));
@@ -126,6 +123,13 @@ void setup() {
 
 void loop() {
   if (!dmpReady) return;
+
+  if(Serial.available()>0){
+    command = Serial.read();
+    if(command == 'N'){
+      motor.write(90);
+    }
+  }
 
   if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) { 
         mpu.dmpGetQuaternion(&q, fifoBuffer);
@@ -142,12 +146,10 @@ void loop() {
           angle_old=angle;
         }
 
-        
-        
         if (sensor.timeoutOccurred()) { Serial.print(" TIMEOUT"); }
 
         // blink LED to indicate activity
-        blinkState = !blinkState;
-        digitalWrite(LED_PIN, blinkState);
+        //blinkState = !blinkState;
+        //digitalWrite(LED_PIN, blinkState);
     }
 }
