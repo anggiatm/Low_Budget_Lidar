@@ -33,14 +33,30 @@ Quaternion q;       // w, x, y, z] quaternion container
 VectorFloat gravity;// [x, y, z] gravity vector
 float ypr[3]; // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
 
-int angle;
-int angle_old = 180;
+//ROUND
+//int angle;
+//int angle_old = 180;
 
-char command;
+//NO ROUND
+float angle;
+float angle_old = 180.00;
+float error = 0;
+
+String COMMAND_STRING;
+int COMMAND_INTEGER;
 
 volatile bool mpuInterrupt = false;
 void dmpDataReady() {
     mpuInterrupt = true;
+}
+
+float getAngle(){
+    mpu.dmpGetCurrentFIFOPacket(fifoBuffer);
+    mpu.dmpGetQuaternion(&q, fifoBuffer);
+    mpu.dmpGetGravity(&gravity, &q);
+    mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
+
+    return ((ypr[0] * 180/M_PI) + 180);
 }
 
 void setup() {
@@ -56,6 +72,7 @@ void setup() {
 
     Serial.begin(115200);
     motor.attach(3);
+    motor.write(98);                                   // SERVO NEUTRAL
 
     sensor.setTimeout(500);
     
@@ -99,7 +116,7 @@ void setup() {
 
         // enable Arduino interrupt detection
         //Serial.print(F("Enabling interrupt detection (Arduino external interrupt "));
-        digitalPinToInterrupt(INTERRUPT_PIN);
+        //digitalPinToInterrupt(INTERRUPT_PIN);
         //Serial.print();
         //Serial.println(F(")..."));
         attachInterrupt(digitalPinToInterrupt(INTERRUPT_PIN), dmpDataReady, RISING);
@@ -118,38 +135,44 @@ void setup() {
     // configure LED for output
     pinMode(LED_PIN, OUTPUT);
 
-
+    motor.write(105);
+    delay(1000);
 }
 
 void loop() {
-  if (!dmpReady) return;
-
-  if(Serial.available()>0){
-    command = Serial.read();
-    if(command == 'N'){
-      motor.write(90);
-    }
-  }
-
-  if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) { 
-        mpu.dmpGetQuaternion(&q, fifoBuffer);
-        mpu.dmpGetGravity(&gravity, &q);
-        mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
-
-        angle = (round(ypr[0] * 180/M_PI)) + 180;
-
-        if (angle != angle_old){
-          Serial.print(angle);
-          Serial.print(",");
-          Serial.print(sensor.readRangeSingleMillimeters());
-          Serial.println(",");
-          angle_old=angle;
+    while (dmpReady && !sensor.timeoutOccurred())
+    {
+        angle = getAngle();
+        if (round(angle) != angle_old){
+            error = error - 0.0045;
+            Serial.print(round (angle + error));
+            Serial.print(",");
+            Serial.print(sensor.readRangeSingleMillimeters());
+            Serial.println(",");
+            angle_old = round(angle);
         }
 
-        if (sensor.timeoutOccurred()) { Serial.print(" TIMEOUT"); }
+        if(Serial.available()>0){
+            COMMAND_INTEGER = (Serial.readString()).toInt();
+            //motor.write(COMMAND_INTEGER);
+            Serial.println(COMMAND_INTEGER);
+            while (angle != COMMAND_INTEGER){
+                mpu.dmpGetCurrentFIFOPacket(fifoBuffer);
+                mpu.dmpGetQuaternion(&q, fifoBuffer);
+                mpu.dmpGetGravity(&gravity, &q);
+                mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
 
+                angle = (round(ypr[0] * 180/M_PI)) + 180;
+                motor.write(105);
+                Serial.println((ypr[0] * 180/M_PI) + 180);
+            }
+            motor.write(98);
+        }
+    }
+    Serial.println(" TIMEOUT");
+    return;
         // blink LED to indicate activity
         //blinkState = !blinkState;
         //digitalWrite(LED_PIN, blinkState);
-    }
+    
 }
