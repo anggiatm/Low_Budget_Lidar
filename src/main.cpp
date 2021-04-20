@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <ArduinoJson.h>
 #include "I2Cdev.h"
 #include "MPU6050_6Axis_MotionApps20.h"
 #include <VL53L0X.h>
@@ -38,9 +39,12 @@ float ypr[3]; // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vecto
 //int angle_old = 180;
 
 //NO ROUND
-float angle;
-float angle_old = 180.00;
-float error = 0;
+int angle = 0;
+int angle_old = 400;
+
+StaticJsonDocument<1024> doc;
+
+int count;
 
 String COMMAND_STRING;
 int COMMAND_INTEGER;
@@ -50,25 +54,29 @@ void dmpDataReady() {
     mpuInterrupt = true;
 }
 
-float getAngle(){
+int getAngle(){
+    int mapa;
     mpu.dmpGetCurrentFIFOPacket(fifoBuffer);
     mpu.dmpGetQuaternion(&q, fifoBuffer);
     mpu.dmpGetGravity(&gravity, &q);
     mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
-
-    return ((ypr[0] * 180/M_PI) + 180);
+    int raw = (ypr[0] * 57.2958)+180;
+    if (raw<=180){
+        mapa = map(raw, 180, 0, 0, 180);
+    }
+    else {
+        mapa = map(raw, 359, 181, 181, 359);
+    }
+    return mapa;
 }
 
 void setup() {
-
     #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
         Wire.begin();
         Wire.setClock(400000); 
     #elif I2CDEV_IMPLEMENTATION == I2CDEV_BUILTIN_FASTWIRE
         Fastwire::setup(400, true);
     #endif
-
-    
 
     Serial.begin(115200);
     motor.attach(3);
@@ -135,44 +143,64 @@ void setup() {
     // configure LED for output
     pinMode(LED_PIN, OUTPUT);
 
-    motor.write(105);
+    // while(round(getAngle()) != 0){
+    //     motor.write(101);
+    // }
+
+    motor.write(98);
     delay(1000);
 }
 
 void loop() {
-    while (dmpReady && !sensor.timeoutOccurred())
-    {
-        angle = getAngle();
-        if (round(angle) != angle_old){
-            error = error - 0.0045;
-            Serial.print(round (angle + error));
-            Serial.print(",");
-            Serial.print(sensor.readRangeSingleMillimeters());
-            Serial.println(",");
-            angle_old = round(angle);
-        }
+    while (dmpReady && !sensor.timeoutOccurred()){
+        // motor.write(97);
+        // angle = round(getAngle());
+        //         if (angle != angle_old){
+        //             Serial.print(round (angle));
+        //             Serial.print(",");
+        //             Serial.print(sensor.readRangeSingleMillimeters());
+        //             Serial.println(",");
+        //             angle_old = round(angle);
+        //         }
 
         if(Serial.available()>0){
             COMMAND_INTEGER = (Serial.readString()).toInt();
-            //motor.write(COMMAND_INTEGER);
             Serial.println(COMMAND_INTEGER);
-            while (angle != COMMAND_INTEGER){
-                mpu.dmpGetCurrentFIFOPacket(fifoBuffer);
-                mpu.dmpGetQuaternion(&q, fifoBuffer);
-                mpu.dmpGetGravity(&gravity, &q);
-                mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
+            if (COMMAND_INTEGER == 1){
+                // while (getAngle() > 0 ){
+                //     motor.write(100);
+                //     break;
+                // }
+               
+                count = 0;
+            }
 
-                angle = (round(ypr[0] * 180/M_PI)) + 180;
-                motor.write(105);
-                Serial.println((ypr[0] * 180/M_PI) + 180);
+            while (count != 360){
+                angle = getAngle();
+                
+                if (angle != angle_old){
+                    //arr[angle] = sensor.readRangeSingleMillimeters();
+                    //Serial.print(angle);
+                    //Serial.print(",");
+                    //Serial.print(sensor.readRangeSingleMillimeters());
+                    //Serial.println(",");
+                    doc[String(angle)] = String(sensor.readRangeSingleMillimeters());
+                    //doc["range"] = sensor.readRangeSingleMillimeters();
+                    angle_old = angle;
+                    count = count+1;
+                }
+                motor.write(94);
             }
             motor.write(98);
+            serializeJson(doc, Serial);
         }
     }
-    Serial.println(" TIMEOUT");
+        Serial.println(" TIMEOUT");
     return;
+    
+    
         // blink LED to indicate activity
         //blinkState = !blinkState;
-        //digitalWrite(LED_PIN, blinkState);
+        //digitalWrite(LED_PIN, blinkState);0
     
 }
