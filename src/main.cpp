@@ -18,8 +18,6 @@ MPU6050 mpu;
 #define LED_PIN 13
 #define INTERRUPT_PIN 2
 
-// VL53L0X
-
 bool blinkState = false;
 bool dmpReady = false;  
 
@@ -86,7 +84,7 @@ void setup() {
     
     if (!sensor.init())
     {
-        //Serial.println("Failed to detect and initialize sensor!");
+        Serial.println("Failed to detect and initialize sensor!");
         while (1) {}
     }
     
@@ -94,17 +92,18 @@ void setup() {
     sensor.setMeasurementTimingBudget(20000);
 
     // initialize device
-    //Serial.println(F("Initializing I2C devices..."));
+    Serial.println(F("Initializing I2C devices..."));
     mpu.initialize();
     pinMode(INTERRUPT_PIN, INPUT);
-
     // verify connection
-    //Serial.println(F("Testing device connections..."));
-    //Serial.println(mpu.testConnection() ? F("MPU6050 connection successful") : F("MPU6050 connection failed"));
+    Serial.println(F("Testing device connections..."));
+    Serial.println(mpu.testConnection() ? F("MPU6050 connection successful") : F("MPU6050 connection failed"));
 
     // load and configure the DMP
-    //Serial.println(F("Initializing DMP..."));
+    Serial.println(F("Initializing DMP..."));
     devStatus = mpu.dmpInitialize();
+    Serial.println(devStatus);
+     
 
     // supply your own gyro offsets here, scaled for min sensitivity
     mpu.setXGyroOffset(220);
@@ -114,12 +113,12 @@ void setup() {
 
     // make sure it worked (returns 0 if so)
     if (devStatus == 0) {
-        // Calibration Time: generate offsets and calibrate our MPU6050
+        // Calibration Time: generate offxsets and calibrate our MPU6050
         mpu.CalibrateAccel(6);
         mpu.CalibrateGyro(6);
         mpu.PrintActiveOffsets();
         // turn on the DMP, now that it's ready
-        //Serial.println(F("Enabling DMP..."));
+        Serial.println(F("Enabling DMP..."));
         mpu.setDMPEnabled(true);
 
         // enable Arduino interrupt detection
@@ -130,14 +129,14 @@ void setup() {
         attachInterrupt(digitalPinToInterrupt(INTERRUPT_PIN), dmpDataReady, RISING);
         mpuIntStatus = mpu.getIntStatus();
 
-        //Serial.println(F("DMP ready! Waiting for first interrupt..."));
+        Serial.println(F("DMP ready! Waiting for first interrupt..."));
         dmpReady = true;
 
         packetSize = mpu.dmpGetFIFOPacketSize();
     } else {
-        //Serial.print(F("DMP Initialization failed (code "));
-        //Serial.print(devStatus);
-        //Serial.println(F(")"));
+        Serial.print(F("DMP Initialization failed (code "));
+        Serial.print(devStatus);
+        Serial.println(F(")"));
     }
 
     // configure LED for output
@@ -147,7 +146,7 @@ void setup() {
     //     motor.write(101);
     // }
 
-    motor.write(98);
+    motor.write(100);
     delay(1000);
 }
 
@@ -162,6 +161,7 @@ void loop() {
         //             Serial.println(",");
         //             angle_old = round(angle);
         //         }
+        Serial.println(sensor.readRangeSingleMillimeters());
 
         if(Serial.available()>0){
             COMMAND_INTEGER = (Serial.readString()).toInt();
